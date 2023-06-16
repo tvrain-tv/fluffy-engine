@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>TVRain Player</title>
+  <script  src="https://cdn.jwplayer.com/libraries/vgmcxyTN.js"></script>
+</head>
+<body style="margin: 0; padding: 0">
+<div id="playerID"></div>
+<script>
+  let loaded = false
+  
+  function sendMessage(msgID, type, payload) {
+    window.parent.postMessage({ source: "jwpIframe", msgID, type, payload }, "*");
+  }
+  function setHandlers(jwp) {
+    ['ready', 'idle', 'buffer', 'play', 'adPlay', 'pause', 'error'].forEach((eventName) => {
+      jwp.on(eventName, (value) => sendMessage(null, 'jwp_event', { event: eventName, value }));
+    })
+  }
+  async function setWidth() {
+    const { innerWidth } = window
+    const player = window.jwplayer('playerID')
+    const height = innerWidth / 16 * 9
+    await player.resize(innerWidth, height)
+  }
+  window.addEventListener('message', async (event) => {
+    let messageID = 'jwpIframe_error'
+    try {
+      const player = window.jwplayer('playerID')
+      const { data } = event
+      if (data?.source !== 'jwpParent') return
+      const { msgID, payload } = data
+      messageID = msgID
+      const {command, value} = payload;
+      if (!Object.hasOwn(player, command)) throw new Error('unknown command')
+      await player[command](value)
+      if (!loaded) {
+        setHandlers(player)
+        await setWidth()
+        loaded = true
+      }
+      sendMessage(msgID, 'jwp_command', 'success')
+    } catch (error) {
+      sendMessage(messageID, 'jwp_command', error)
+    }
+    
+  }, false)
+  window.addEventListener('resize', () => {
+    setWidth()
+  })
+</script>
+</body>
+</html>
