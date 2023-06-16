@@ -3,10 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <title>TVRain Player</title>
-  <script  src="https://cdn.jwplayer.com/libraries/vgmcxyTN.js"></script>
+  <script  src="https://cdn.jwplayer.com/libraries/tZ8x5tWS.js"></script>
 </head>
 <body style="margin: 0; padding: 0">
-<div id="playerID"></div>
+<div id="tZ8x5tWS"></div>
 <script>
   let loaded = false
   
@@ -20,14 +20,14 @@
   }
   async function setWidth() {
     const { innerWidth } = window
-    const player = window.jwplayer('playerID')
+    const player = window.jwplayer('tZ8x5tWS')
     const height = innerWidth / 16 * 9
     await player.resize(innerWidth, height)
   }
   window.addEventListener('message', async (event) => {
     let messageID = 'jwpIframe_error'
     try {
-      const player = window.jwplayer('playerID')
+      const player = window.jwplayer('tZ8x5tWS')
       const { data } = event
       if (data?.source !== 'jwpParent') return
       const { msgID, payload } = data
