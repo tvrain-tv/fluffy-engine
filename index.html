@@ -1,54 +1,124 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>TVRain Player</title>
-  <script  src="https://cdn.jwplayer.com/libraries/tZ8x5tWS.js"></script>
+	<meta charset="UTF-8">
+	<title>TVRain Player</title>
+	<script>
+        window.gtag = function () {}
+	</script>
+	<script src="https://cdn.jwplayer.com/libraries/tZ8x5tWS.js"></script>
 </head>
 <body style="margin: 0; padding: 0">
 <div id="tZ8x5tWS"></div>
 <script>
-  let loaded = false
-  
-  function sendMessage(msgID, type, payload) {
-    window.parent.postMessage({ source: "jwpIframe", msgID, type, payload }, "*");
-  }
-  function setHandlers(jwp) {
-    ['ready', 'idle', 'buffer', 'play', 'adPlay', 'pause', 'error'].forEach((eventName) => {
-      jwp.on(eventName, (value) => sendMessage(null, 'jwp_event', { event: eventName, value }));
-    })
-  }
-  async function setWidth() {
-    const { innerWidth } = window
-    const player = window.jwplayer('tZ8x5tWS')
-    const height = innerWidth / 16 * 9
-    await player.resize(innerWidth, height)
-  }
-  window.addEventListener('message', async (event) => {
-    let messageID = 'jwpIframe_error'
-    try {
-      const player = window.jwplayer('tZ8x5tWS')
-      const { data } = event
-      if (data?.source !== 'jwpParent') return
-      const { msgID, payload } = data
-      messageID = msgID
-      const {command, value} = payload;
-      if (!Object.hasOwn(player, command)) throw new Error('unknown command')
-      await player[command](value)
-      if (!loaded) {
-        setHandlers(player)
-        await setWidth()
-        loaded = true
-      }
-      sendMessage(msgID, 'jwp_command', 'success')
-    } catch (error) {
-      sendMessage(messageID, 'jwp_command', error)
+    let loaded = false
+
+    function sendMessage(msgID, type, payload) {
+        window.parent.postMessage({source: "jwpIframe", msgID, type, payload}, "*");
     }
-    
-  }, false)
-  window.addEventListener('resize', () => {
-    setWidth()
-  })
+
+    let timeTrackerTimer = null;
+    let timeTrackerValue = 0;
+    let videoWatched = false;
+
+    function startTimeTracking(jwp, originalEvent) {
+        if (timeTrackerTimer)
+            stopTimeTracking();
+        timeTrackerTimer = setInterval(() => {
+            const currentTime = Math.floor(jwp.getPosition());
+
+            if (isFinite(originalEvent.video_duration)) {
+                // send 10% progress
+                const currentPercent = Math.floor((currentTime * 100) / originalEvent.video_duration);
+                const currentThreshold = Math.floor(currentPercent / 10)
+                originalEvent.video_current_time = currentTime;
+                originalEvent.video_percent = currentPercent
+
+                if (currentThreshold > timeTrackerValue) {
+                    timeTrackerValue = currentThreshold
+                    sendMessage(null, 'jwp_event', {event: 'video_progress', value: originalEvent})
+                }
+            } else {
+                // send 1% for each 10 minutes
+                const currentPercent = Math.floor(currentTime / 600)
+                originalEvent.video_current_time = currentTime;
+                originalEvent.video_percent = currentPercent
+                if (currentPercent > timeTrackerValue) {
+                    timeTrackerValue = currentPercent
+                    sendMessage(null, 'jwp_event', {event: 'video_progress', value: originalEvent})
+                }
+            }
+        }, 60 * 1000);
+    }
+
+    function stopTimeTracking() {
+        clearInterval(timeTrackerTimer)
+    }
+
+
+    function setHandlers(jwp) {
+        ['ready', 'idle', 'buffer', 'play', 'adPlay', 'pause', 'error'].forEach((eventName) => {
+            jwp.on(eventName, (value) => {
+
+                value = {
+                    ...value,
+                    video_current_time: Math.round(jwp.getPosition()),
+                    video_duration: Math.round(jwp.getDuration())
+                }
+                value.video_percent = Math.round((value.video_current_time * 100) / value.video_duration);
+                if (eventName === 'play')
+                    eventName = 'video_start';
+
+                if (!videoWatched && value.video_current_time / value.video_duration > 0.95) {
+                    videoWatched = true;
+                    stopTimeTracking();
+                    sendMessage(null, 'jwp_event', {event: 'video_complete', value})
+                    return;
+                }
+
+                if (eventName === 'video_start' && !videoWatched)
+                    startTimeTracking(jwp, value);
+                else
+                    stopTimeTracking();
+                sendMessage(null, 'jwp_event', {event: eventName, value})
+
+
+            });
+        })
+    }
+
+    async function setWidth() {
+        const {innerWidth} = window
+        const player = window.jwplayer('tZ8x5tWS')
+        const height = innerWidth / 16 * 9
+        await player.resize(innerWidth, height)
+    }
+
+    window.addEventListener('message', async (event) => {
+        let messageID = 'jwpIframe_error'
+        try {
+            const player = window.jwplayer('tZ8x5tWS')
+            const {data} = event
+            if (data?.source !== 'jwpParent') return
+            const {msgID, payload} = data
+            messageID = msgID
+            const {command, value} = payload;
+            if (!Object.hasOwn(player, command)) throw new Error('unknown command')
+            await player[command](value)
+            if (!loaded) {
+                setHandlers(player)
+                await setWidth()
+                loaded = true
+            }
+            sendMessage(msgID, 'jwp_command', 'success')
+        } catch (error) {
+            sendMessage(messageID, 'jwp_command', error)
+        }
+
+    }, false)
+    window.addEventListener('resize', () => {
+        setWidth()
+    })
 </script>
 </body>
 </html>
