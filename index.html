@@ -1,11 +1,19 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" style="overflow: hidden">
 <head>
 	<meta charset="UTF-8">
 	<title>TVRain Player</title>
 	<script>
         window.gtag = function () {}
 	</script>
+	<style>
+		html,body{
+			background: transparent;
+		}
+        .jw-rightclick.jw-reset {
+            display: none !important;
+        }
+	</style>
 	<script src="https://cdn.jwplayer.com/libraries/tZ8x5tWS.js"></script>
 </head>
 <body style="margin: 0; padding: 0">
@@ -91,7 +99,7 @@
         const {innerWidth} = window
         const player = window.jwplayer('tZ8x5tWS')
         const height = innerWidth / 16 * 9
-        await player.resize(innerWidth, height)
+        await player.resize(innerWidth, Math.floor(height))
     }
 
     window.addEventListener('message', async (event) => {
